@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataLens — Excel Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════ */
+:root {
+  --washi: #FAFAF8;
+  --washi2: #F4F0EC;
+  --washi3: #EDE7DE;
+  --ink: #1C1C1E;
+  --ink2: #3A3A3C;
+  --ink3: #6B6B70;
+  --ink4: #AEAEB2;
+  --ume: #C94F6D;        /* plum red — primary accent */
+  --ume-light: #F5D5DD;
+  --ume-mid: #E8A0B0;
+  --matcha: #5D8A7A;     /* secondary */
+  --matcha-light: #D4E8E3;
+  --gold: #B08850;       /* tertiary */
+  --gold-light: #F0E6D3;
+  --border: rgba(28,28,30,.1);
+  --border2: rgba(28,28,30,.06);
+  --shadow-sm: 0 1px 4px rgba(28,28,30,.08);
+  --shadow: 0 4px 20px rgba(28,28,30,.1);
+  --shadow-lg: 0 12px 48px rgba(28,28,30,.14);
+  --glass: rgba(250,250,248,.82);
+  --glass-border: rgba(255,255,255,.7);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --font-serif: 'Noto Serif JP', serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --nav-h: 64px;
+  --transition: .2s cubic-bezier(.4,0,.2,1);
+}
+[data-theme="dark"] {
+  --washi: #0D0D10;
+  --washi2: #17171C;
+  --washi3: #202028;
+  --ink: #F5F5F0;
+  --ink2: #D0CFC8;
+  --ink3: #8E8E95;
+  --ink4: #48484E;
+  --border: rgba(245,245,240,.1);
+  --border2: rgba(245,245,240,.05);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,.3);
+  --shadow: 0 4px 20px rgba(0,0,0,.4);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,.5);
+  --glass: rgba(13,13,16,.85);
+  --glass-border: rgba(255,255,255,.08);
+  --ume-light: rgba(201,79,109,.18);
+  --matcha-light: rgba(93,138,122,.15);
+  --gold-light: rgba(176,136,80,.15);
+}
+
+/* ═══════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+body{
+  font-family:var(--font-sans);
+  background:var(--washi);
+  color:var(--ink);
+  min-height:100vh;
+  overflow-x:hidden;
+  transition:background var(--transition), color var(--transition);
+}
+::selection{background:var(--ume-light);color:var(--ume)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ═══════════════════════════════════════
+   SAKURA BACKGROUND
+═══════════════════════════════════════ */
+#sakura-canvas{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.4}
+[data-theme="dark"] #sakura-canvas{opacity:.15}
+
+/* ═══════════════════════════════════════
+   FLOATING NAV
+═══════════════════════════════════════ */
+.nav-wrap{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%);
+  z-index:1000;
+  display:flex;align-items:center;gap:0;
+  background:var(--glass);
+  backdrop-filter:blur(24px) saturate(1.8);
+  -webkit-backdrop-filter:blur(24px) saturate(1.8);
+  border:1px solid var(--glass-border);
+  border-radius:100px;
+  padding:6px 8px;
+  box-shadow:var(--shadow);
+  transition:all var(--transition);
+}
+.nav-logo{
+  display:flex;align-items:center;gap:9px;
+  padding:4px 14px 4px 8px;
+  margin-right:4px;
+  border-right:1px solid var(--border);
+  text-decoration:none;
+  flex-shrink:0;
+}
+.nav-logo-text{
+  font-family:var(--font-serif);
+  font-size:16px;font-weight:700;
+  color:var(--ink);letter-spacing:-.3px;
+}
+.nav-tab{
+  position:relative;
+  display:flex;align-items:center;gap:6px;
+  padding:8px 16px;
+  border-radius:100px;
+  font-size:13px;font-weight:500;
+  color:var(--ink3);
+  cursor:pointer;
+  transition:all var(--transition);
+  white-space:nowrap;user-select:none;border:none;background:none;font-family:inherit;
+}
+.nav-tab:hover{color:var(--ink);background:var(--border2)}
+.nav-tab.active{
+  background:var(--ume);color:#fff;
+  box-shadow:0 2px 12px rgba(201,79,109,.35);
+}
+.nav-tab .nb{
+  background:rgba(255,255,255,.3);
+  color:#fff;font-size:10px;font-weight:700;
+  padding:1px 6px;border-radius:20px;min-width:18px;text-align:center;
+  display:none;
+}
+.nav-tab.active .nb{display:inline}
+.nav-tab:not(.active) .nb-inactive{
+  background:var(--ume);color:#fff;font-size:10px;font-weight:700;
+  padding:1px 5px;border-radius:20px;min-width:16px;text-align:center;
+}
+.nav-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+.nav-actions{display:flex;align-items:center;gap:6px;margin-left:8px;padding-left:8px;border-left:1px solid var(--border)}
+.theme-btn{
+  width:32px;height:32px;border-radius:50%;border:none;cursor:pointer;
+  background:var(--washi2);color:var(--ink3);font-size:15px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all var(--transition);
+}
+.theme-btn:hover{background:var(--washi3);color:var(--ink)}
+
+/* ═══════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════ */
+.page{
+  display:none;
+  max-width:1320px;margin:0 auto;
+  padding:calc(var(--nav-h) + 52px) 32px 48px;
+  position:relative;z-index:1;
+  min-height:100vh;
+}
+.page.active{display:block}
+@media(max-width:768px){.page{padding:calc(var(--nav-h)+52px) 16px 40px}}
+
+/* ═══════════════════════════════════════
+   SIDEBAR + MAIN (SEARCH PAGE)
+═══════════════════════════════════════ */
+.search-layout{display:flex;gap:20px;align-items:flex-start}
+.search-sidebar{
+  width:240px;flex-shrink:0;
+  position:sticky;top:calc(var(--nav-h)+68px);
+}
+.search-main{flex:1;min-width:0}
+@media(max-width:900px){.search-layout{flex-direction:column}.search-sidebar{width:100%;position:static}}
+
+/* ═══════════════════════════════════════
+   CARDS
+═══════════════════════════════════════ */
+.card{
+  background:var(--washi);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:24px 28px;
+  margin-bottom:20px;
+  box-shadow:var(--shadow-sm);
+  transition:border-color var(--transition),box-shadow var(--transition);
+}
+.card:hover{border-color:var(--border);box-shadow:var(--shadow)}
+.card-sm{border-radius:var(--radius-sm);padding:16px 20px}
+.card-title{
+  font-family:var(--font-serif);
+  font-size:15px;font-weight:700;
+  color:var(--ink);margin-bottom:18px;
+  display:flex;align-items:center;gap:10px;letter-spacing:-.2px;
+}
+.card-title .ct-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--ume);flex-shrink:0;
+}
+.section-head{
+  font-family:var(--font-serif);
+  font-size:28px;font-weight:700;
+  color:var(--ink);letter-spacing:-.5px;margin-bottom:6px;
+}
+.section-sub{font-size:14px;color:var(--ink3);margin-bottom:28px;line-height:1.6}
+
+/* ═══════════════════════════════════════
+   UPLOAD PAGE
+═══════════════════════════════════════ */
+.upload-hero{
+  text-align:center;
+  padding:64px 20px 48px;
+  max-width:560px;margin:0 auto;
+}
+.upload-hero .hero-eyebrow{
+  font-size:11px;font-weight:600;letter-spacing:2px;
+  text-transform:uppercase;color:var(--ume);
+  margin-bottom:16px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.upload-hero .hero-eyebrow::before,.upload-hero .hero-eyebrow::after{
+  content:'';flex:1;max-width:40px;height:1px;background:var(--ume-mid);
+}
+.upload-hero h1{
+  font-family:var(--font-serif);
+  font-size:40px;font-weight:700;
+  color:var(--ink);letter-spacing:-1px;line-height:1.15;
+  margin-bottom:14px;
+}
+.upload-hero h1 em{font-style:normal;color:var(--ume)}
+.upload-hero p{font-size:15px;color:var(--ink3);line-height:1.7;margin-bottom:36px}
+
+.drop-zone{
+  border:2px dashed var(--border);
+  border-radius:20px;
+  padding:52px 32px;text-align:center;cursor:pointer;
+  background:var(--washi2);
+  position:relative;overflow:hidden;
+  transition:all var(--transition);
+}
+.drop-zone::before{
+  content:'';position:absolute;
+  inset:-1px;border-radius:20px;
+  background:linear-gradient(135deg,var(--ume-light),var(--gold-light),var(--matcha-light));
+  opacity:0;transition:opacity var(--transition);z-index:0;
+}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--ume);box-shadow:0 0 0 4px var(--ume-light)}
+.drop-zone:hover::before,.drop-zone.drag-over::before{opacity:1}
+.drop-zone>*{position:relative;z-index:1}
+.dz-icon{
+  width:72px;height:72px;
+  background:var(--washi);
+  border:1px solid var(--border);
+  border-radius:18px;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 20px;
+  box-shadow:var(--shadow-sm);
+  transition:transform var(--transition);
+}
+.drop-zone:hover .dz-icon{transform:translateY(-4px)}
+.dz-title{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.dz-sub{font-size:13px;color:var(--ink3);line-height:1.6}
+.dz-formats{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.dz-fmt{
+  background:var(--washi);border:1px solid var(--border);
+  border-radius:var(--radius-xs);padding:3px 10px;
+  font-size:11px;color:var(--ink3);font-weight:600;letter-spacing:.3px;
+}
+
+/* Progress bar */
+.progress-wrap{margin-top:20px;display:none}
+.progress-label{display:flex;justify-content:space-between;font-size:12px;color:var(--ink3);margin-bottom:6px;font-weight:500}
+.progress-bar{height:4px;background:var(--washi3);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--ume),var(--gold));border-radius:2px;transition:width .4s ease;width:0%}
+
+/* File chips */
+.file-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;justify-content:center}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;
+  border-radius:100px;padding:6px 14px;
+  font-size:12px;font-weight:600;
+  border:1px solid;font-family:var(--font-sans);
+  transition:opacity var(--transition);
+}
+.chip-rm{
+  cursor:pointer;opacity:.5;
+  width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:50%;transition:all .1s;font-size:11px;
+}
+.chip-rm:hover{opacity:1;background:rgba(0,0,0,.15)}
+.upload-cta{margin-top:28px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+
+/* ═══════════════════════════════════════
+   KPI CARDS
+═══════════════════════════════════════ */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:24px}
+.kpi{
+  background:var(--washi);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:20px 22px;
+  position:relative;overflow:hidden;
+  transition:transform var(--transition),box-shadow var(--transition);
+}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.kpi-label{font-size:11px;font-weight:600;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
+.kpi-value{font-family:var(--font-serif);font-size:32px;font-weight:700;color:var(--ink);line-height:1;letter-spacing:-1px}
+.kpi-sub{font-size:11px;color:var(--ink4);margin-top:4px}
+.kpi-accent{
+  position:absolute;right:-12px;bottom:-12px;
+  width:56px;height:56px;border-radius:50%;opacity:.12;
+}
+
+/* ═══════════════════════════════════════
+   CHARTS
+═══════════════════════════════════════ */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
+.charts-row.three{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:900px){.charts-row,.charts-row.three{grid-template-columns:1fr}}
+.chart-card{background:var(--washi);border:1px solid var(--border);border-radius:var(--radius-sm);padding:22px 24px}
+.chart-title{font-size:12px;font-weight:600;color:var(--ink3);margin-bottom:14px;letter-spacing:.4px;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.chart-title::before{content:'';width:14px;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--ume),var(--gold));display:inline-block}
+.chart-wrap{position:relative;height:200px}
+
+/* ═══════════════════════════════════════
+   TABLES
+═══════════════════════════════════════ */
+.tbl-wrap{border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.tbl-scroll{overflow-x:auto;max-height:480px;overflow-y:auto}
+table.dt{width:100%;border-collapse:collapse;font-size:12.5px}
+table.dt thead th{
+  background:var(--washi2);padding:11px 14px;text-align:left;
+  font-weight:600;font-size:11px;color:var(--ink3);
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;
+  white-space:nowrap;letter-spacing:.3px;text-transform:uppercase;
+}
+table.dt thead th.src-h{background:var(--washi3);position:sticky;left:0;z-index:3}
+table.dt thead th.match-h{background:var(--ume-light);color:var(--ume)}
+table.dt tbody td{
+  padding:10px 14px;border-bottom:1px solid var(--border2);
+  color:var(--ink2);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+table.dt tbody tr:last-child td{border-bottom:none}
+table.dt tbody tr:hover td{background:var(--washi2)}
+td.src-col{position:sticky;left:0;background:var(--washi);z-index:1;border-right:1px solid var(--border);min-width:190px}
+tbody tr:hover td.src-col{background:var(--washi2)}
+.src-badge{display:flex;flex-direction:column;gap:3px}
+.src-file{font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px;display:inline-block;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src-sheet{font-size:10px;color:var(--ink3);padding-left:2px}
+mark{background:var(--ume-light);color:var(--ume);border-radius:3px;padding:0 2px;font-weight:700}
+.col-alias{font-size:9px;color:var(--ink4);display:block;margin-top:1px;font-style:italic}
+
+/* ═══════════════════════════════════════
+   FILE BREAKDOWN TABLE
+═══════════════════════════════════════ */
+.fb-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.fb-tbl th{background:var(--washi2);padding:10px 14px;text-align:left;font-weight:600;font-size:11px;color:var(--ink3);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.4px}
+.fb-tbl td{padding:12px 14px;border-bottom:1px solid var(--border2);color:var(--ink2)}
+.fb-tbl tr:last-child td{border-bottom:none}
+.fb-tbl tr:hover td{background:var(--washi2)}
+.fb-bar-bg{width:100%;background:var(--washi3);border-radius:3px;height:5px;overflow:hidden}
+.fb-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--ume),var(--gold));transition:width .8s ease}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+
+/* ═══════════════════════════════════════
+   SEARCH PAGE
+═══════════════════════════════════════ */
+.search-input-card{
+  background:var(--washi);border:1.5px solid var(--border);
+  border-radius:var(--radius);padding:16px 20px;
+  margin-bottom:16px;box-shadow:var(--shadow-sm);
+  display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+  transition:border-color var(--transition),box-shadow var(--transition);
+}
+.search-input-card:focus-within{border-color:var(--ume);box-shadow:0 0 0 3px var(--ume-light)}
+.si-wrap{flex:1;min-width:220px;display:flex;align-items:center;gap:10px}
+.si-wrap svg{color:var(--ume);flex-shrink:0}
+.si-wrap input{flex:1;border:none;outline:none;font-size:15px;color:var(--ink);background:transparent;font-family:var(--font-sans)}
+.si-wrap input::placeholder{color:var(--ink4)}
+select.si-sel{
+  padding:8px 12px;background:var(--washi2);
+  border:1px solid var(--border);border-radius:var(--radius-xs);
+  font-size:12px;color:var(--ink2);outline:none;cursor:pointer;font-family:var(--font-sans);
+  transition:border-color var(--transition);
+}
+select.si-sel:focus{border-color:var(--ume)}
+
+/* Search history sidebar */
+.history-card{
+  background:var(--washi);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:0;overflow:hidden;
+}
+.history-header{
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  font-size:11px;font-weight:700;color:var(--ink3);
+  letter-spacing:.6px;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.history-list{max-height:360px;overflow-y:auto}
+.history-item{
+  padding:11px 18px;border-bottom:1px solid var(--border2);
+  cursor:pointer;transition:background var(--transition);
+  display:flex;align-items:center;gap:10px;
+}
+.history-item:hover{background:var(--ume-light)}
+.history-item:last-child{border-bottom:none}
+.hi-q{font-size:13px;color:var(--ink);font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hi-count{font-size:10px;color:var(--ume);background:var(--ume-light);border-radius:10px;padding:1px 7px;font-weight:700;flex-shrink:0}
+.hi-time{font-size:10px;color:var(--ink4);flex-shrink:0}
+.history-empty{padding:24px 18px;text-align:center;font-size:12px;color:var(--ink4)}
+
+/* Column map toggle */
+.map-toggle{font-size:12px;color:var(--matcha);cursor:pointer;display:inline-flex;align-items:center;gap:5px;margin-bottom:12px;padding:5px 12px;background:var(--matcha-light);border:1px solid rgba(93,138,122,.2);border-radius:100px;font-weight:500;transition:all var(--transition)}
+.map-toggle:hover{background:var(--matcha-light);opacity:.85}
+#col-map-panel{display:none;background:var(--washi2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 20px;margin-bottom:16px;font-size:12px}
+.map-group{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border2)}
+.map-group:last-child{border-bottom:none}
+.map-canonical{font-weight:700;color:var(--ink);min-width:150px;font-size:12px}
+.alias-tag{background:var(--washi3);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:11px;color:var(--ink3)}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink3);background:var(--washi2);border:1px solid var(--border);border-radius:100px;padding:3px 10px}
+.legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+/* Empty states */
+.empty-state{padding:64px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
+.es-icon{width:64px;height:64px;background:var(--washi2);border:1px solid var(--border);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:4px}
+.es-title{font-family:var(--font-serif);font-size:17px;font-weight:700;color:var(--ink2)}
+.es-sub{font-size:13px;color:var(--ink3);max-width:300px;line-height:1.7}
+
+/* Actions bar */
+.actions-bar{display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px}
+.result-count{font-size:12px;color:var(--ink3);font-weight:500}
+
+/* ═══════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════ */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 18px;border-radius:100px;
+  font-size:13px;font-weight:600;cursor:pointer;
+  border:1.5px solid var(--border);
+  background:var(--washi2);color:var(--ink2);
+  font-family:var(--font-sans);
+  transition:all var(--transition);white-space:nowrap;
+}
+.btn:hover{background:var(--washi3);border-color:var(--ink4);color:var(--ink)}
+.btn-primary{background:var(--ume);color:#fff;border-color:var(--ume);box-shadow:0 2px 12px rgba(201,79,109,.3)}
+.btn-primary:hover{background:#b8435f;border-color:#b8435f;box-shadow:0 4px 20px rgba(201,79,109,.4)}
+.btn-matcha{background:var(--matcha);color:#fff;border-color:var(--matcha)}
+.btn-matcha:hover{background:#4d7a6b}
+.btn-sm{padding:6px 14px;font-size:12px}
+
+/* ═══════════════════════════════════════
+   LOADING OVERLAY
+═══════════════════════════════════════ */
+#loading-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(250,250,248,.9);
+  backdrop-filter:blur(16px);z-index:2000;
+  align-items:center;justify-content:center;flex-direction:column;gap:18px;
+}
+[data-theme="dark"] #loading-overlay{background:rgba(13,13,16,.92)}
+.loader-petals{position:relative;width:52px;height:52px}
+.loader-petals::before{
+  content:'✿';
+  font-size:40px;color:var(--ume);
+  animation:spin 1.2s linear infinite;
+  display:block;text-align:center;line-height:52px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-label{font-family:var(--font-serif);font-size:14px;color:var(--ink2);font-weight:400}
+
+/* ═══════════════════════════════════════
+   SHEET PREVIEW
+═══════════════════════════════════════ */
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto}
+.tab-btn{padding:10px 18px;font-size:12px;font-weight:600;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all var(--transition);display:flex;align-items:center;gap:6px}
+.tab-btn:hover{color:var(--ink2)}
+.tab-btn.active{color:var(--ume);border-bottom-color:var(--ume)}
+.prev-wrap{border:1px solid var(--border);border-radius:var(--radius-xs);overflow:hidden}
+.prev-scroll{overflow-x:auto;max-height:280px;overflow-y:auto}
+table.prev{width:100%;border-collapse:collapse;font-size:12px}
+table.prev thead th{background:var(--washi2);padding:8px 12px;text-align:left;font-weight:700;font-size:11px;color:var(--ink3);border-bottom:1px solid var(--border);position:sticky;top:0;white-space:nowrap}
+table.prev tbody td{padding:7px 12px;border-bottom:1px solid var(--border2);color:var(--ink2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.prev tbody tr:last-child td{border-bottom:none}
+table.prev tbody tr:hover td{background:var(--washi2)}
+
+/* ═══════════════════════════════════════
+   FINDINGS DASHBOARD
+═══════════════════════════════════════ */
+.pinned-card{
+  background:var(--washi);border:1px solid var(--border);
+  border-radius:var(--radius);padding:22px 26px;margin-bottom:18px;
+  position:relative;overflow:hidden;
+}
+.pinned-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--ume),var(--gold),var(--matcha));
+}
+.pq-label{font-family:var(--font-serif);font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.3px}
+.pf-tag{font-size:11px;padding:3px 10px;border-radius:100px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.pf-tag.ume{background:var(--ume-light);color:var(--ume)}
+.pf-tag.matcha{background:var(--matcha-light);color:var(--matcha)}
+.pf-tag.gold{background:var(--gold-light);color:var(--gold)}
+
+/* ═══════════════════════════════════════
+   PROJECT TRACKER
+═══════════════════════════════════════ */
+.tracker-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:22px;flex-wrap:wrap}
+.tracker-toolbar .t-title{font-family:var(--font-serif);font-size:22px;font-weight:700;color:var(--ink);flex:1;letter-spacing:-.3px}
+.view-toggle{display:flex;background:var(--washi2);border:1px solid var(--border);border-radius:100px;padding:3px;gap:2px}
+.vt-btn{padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink3);transition:all var(--transition);border:none;background:none;font-family:var(--font-sans)}
+.vt-btn.active{background:var(--washi);color:var(--ink);box-shadow:var(--shadow-sm)}
+
+/* Kanban */
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:900px){.kanban{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.kanban{grid-template-columns:1fr}}
+.kanban-col{background:var(--washi2);border-radius:var(--radius-sm);padding:14px;border:1px solid var(--border)}
+.kanban-col-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.kanban-col-name{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.kanban-count{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+.task-card{
+  background:var(--washi);border:1px solid var(--border);
+  border-radius:var(--radius-xs);padding:14px 16px;margin-bottom:10px;
+  cursor:pointer;transition:all var(--transition);
+  position:relative;overflow:hidden;
+}
+.task-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.task-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:2px 0 0 2px}
+.task-card.pri-high::before{background:var(--ume)}
+.task-card.pri-med::before{background:var(--gold)}
+.task-card.pri-low::before{background:var(--matcha)}
+.task-title{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px;line-height:1.4}
+.task-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.task-assignee{
+  font-size:11px;color:var(--ink3);
+  display:flex;align-items:center;gap:5px;
+}
+.task-avatar{
+  width:22px;height:22px;border-radius:50%;
+  background:linear-gradient(135deg,var(--ume),var(--gold));
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:700;color:#fff;flex-shrink:0;
+}
+.task-due{font-size:10px;color:var(--ink4)}
+.task-due.overdue{color:var(--ume);font-weight:600}
+.pri-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;letter-spacing:.2px}
+.pri-tag.high{background:var(--ume-light);color:var(--ume)}
+.pri-tag.med{background:var(--gold-light);color:var(--gold)}
+.pri-tag.low{background:var(--matcha-light);color:var(--matcha)}
+
+/* Task table view */
+.task-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.task-tbl th{background:var(--washi2);padding:11px 14px;text-align:left;font-weight:600;font-size:11px;color:var(--ink3);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.4px}
+.task-tbl td{padding:12px 14px;border-bottom:1px solid var(--border2);color:var(--ink2);vertical-align:middle}
+.task-tbl tr:last-child td{border-bottom:none}
+.task-tbl tr:hover td{background:var(--washi2)}
+
+/* Add task modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(28,28,30,.4);z-index:3000;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-bg.open{display:flex}
+.modal{background:var(--washi);border:1px solid var(--border);border-radius:var(--radius);padding:32px 36px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);position:relative}
+.modal h2{font-family:var(--font-serif);font-size:20px;font-weight:700;color:var(--ink);margin-bottom:22px;letter-spacing:-.3px}
+.form-row{margin-bottom:16px}
+.form-label{font-size:12px;font-weight:600;color:var(--ink3);letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px;display:block}
+.form-input,.form-select,.form-textarea{
+  width:100%;padding:10px 14px;
+  background:var(--washi2);border:1px solid var(--border);
+  border-radius:var(--radius-xs);font-size:14px;color:var(--ink);
+  font-family:var(--font-sans);outline:none;transition:border-color var(--transition);
+}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--ume)}
+.form-textarea{resize:vertical;min-height:80px}
+.form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-close{position:absolute;top:16px;right:16px;width:30px;height:30px;border-radius:50%;background:var(--washi2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ink3);transition:all var(--transition)}
+.modal-close:hover{background:var(--ume-light);color:var(--ume)}
+
+/* Status badges */
+.status-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;display:inline-flex;align-items:center;gap:4px}
+.status-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.st-todo{background:var(--washi3);color:var(--ink3)}
+.st-progress{background:var(--gold-light);color:var(--gold)}
+.st-review{background:var(--ume-light);color:var(--ume)}
+.st-done{background:var(--matcha-light);color:var(--matcha)}
+</style>
+</head>
+<body>
+<canvas id="sakura-canvas"></canvas>
+
+<!-- ══════════════════════════════════
+     LOADING OVERLAY
+══════════════════════════════════ -->
+<div id="loading-overlay">
+  <div class="loader-petals"></div>
+  <span class="loading-label" id="loading-msg">Reading files…</span>
+</div>
+
+<!-- ══════════════════════════════════
+     FLOATING NAV
+══════════════════════════════════ -->
+<nav class="nav-wrap">
+  <a class="nav-logo" href="#" onclick="switchPage('upload');return false">
+    <!-- DataLens SVG Logo: lens iris with sakura petals -->
+    <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+      <circle cx="15" cy="15" r="14" fill="url(#lg1)" opacity=".12"/>
+      <circle cx="15" cy="15" r="9" fill="none" stroke="url(#lg1)" stroke-width="1.5"/>
+      <ellipse cx="15" cy="8" rx="3" ry="5.5" fill="url(#lg1)" opacity=".7" transform="rotate(0 15 15)"/>
+      <ellipse cx="15" cy="8" rx="3" ry="5.5" fill="url(#lg1)" opacity=".7" transform="rotate(72 15 15)"/>
+      <ellipse cx="15" cy="8" rx="3" ry="5.5" fill="url(#lg1)" opacity=".7" transform="rotate(144 15 15)"/>
+      <ellipse cx="15" cy="8" rx="3" ry="5.5" fill="url(#lg1)" opacity=".7" transform="rotate(216 15 15)"/>
+      <ellipse cx="15" cy="8" rx="3" ry="5.5" fill="url(#lg1)" opacity=".7" transform="rotate(288 15 15)"/>
+      <circle cx="15" cy="15" r="3.5" fill="url(#lg1)"/>
+      <defs>
+        <linearGradient id="lg1" x1="0" y1="0" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#C94F6D"/>
+          <stop offset="100%" stop-color="#B08850"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <span class="nav-logo-text">DataLens</span>
+  </a>
+  <div class="nav-tab active" id="ntab-upload" onclick="switchPage('upload')">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12V4m0 0L8 8m4-4l4 4"/></svg>
+    Upload
+  </div>
+  <div class="nav-tab" id="ntab-overview" onclick="switchPage('overview')">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    Overview
+    <span class="nb-inactive" id="badge-files" style="display:none">0</span>
+  </div>
+  <div class="nav-tab" id="ntab-search" onclick="switchPage('search')">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg>
+    Search
+  </div>
+  <div class="nav-tab" id="ntab-findings" onclick="switchPage('findings')">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+    Findings
+    <span class="nb-inactive" id="badge-findings" style="display:none">0</span>
+  </div>
+  <div class="nav-tab" id="ntab-tracker" onclick="switchPage('tracker')">
+    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2"/><path stroke-linecap="round" d="M16 2v4M8 2v4M3 10h18"/></svg>
+    Tracker
+  </div>
+  <div class="nav-sep"></div>
+  <div class="nav-actions">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════
+     PAGE 1 — UPLOAD
+══════════════════════════════════════ -->
+<div class="page active" id="page-upload">
+  <div class="upload-hero">
+    <div class="hero-eyebrow">データレンズ &nbsp; DataLens</div>
+    <h1>See through your<br><em>data</em> clearly.</h1>
+    <p>Upload up to 10 Excel files. DataLens unifies, searches, and visualises every record — instantly, beautifully.</p>
+    <div class="drop-zone" id="drop-zone"
+      onclick="document.getElementById('file-input').click()"
+      ondragover="onDrag(event,true)" ondragleave="onDrag(event,false)" ondrop="onDrop(event)">
+      <div class="dz-icon">
+        <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="url(#dz-grad)" stroke-width="1.6">
+          <defs><linearGradient id="dz-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#C94F6D"/><stop offset="100%" stop-color="#B08850"/></linearGradient></defs>
+          <path stroke-linecap="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V7a2 2 0 012-2h5l2 2h5a2 2 0 012 2v11a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <div class="dz-title">Drop your Excel files here</div>
+      <div class="dz-sub">or click to browse from your computer</div>
+      <div class="dz-formats">
+        <span class="dz-fmt">.xlsx</span>
+        <span class="dz-fmt">.xls</span>
+        <span class="dz-fmt">Up to 10 files</span>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls" multiple style="display:none" onchange="loadFiles(this.files)">
+    </div>
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-label"><span id="progress-name">Indexing…</span><span id="progress-pct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+    <div class="file-chips" id="file-chips"></div>
+    <div class="upload-cta" id="upload-cta" style="display:none">
+      <button class="btn btn-primary" onclick="switchPage('overview')">
+        View Dashboard
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+      </button>
+      <button class="btn" onclick="switchPage('search')">Search Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PAGE 2 — OVERVIEW
+══════════════════════════════════════ -->
+<div class="page" id="page-overview">
+  <div class="section-head">Data Overview</div>
+  <div class="section-sub">A snapshot of everything you've loaded into DataLens</div>
+  <div class="kpi-grid" id="kpi-grid"></div>
+  <div class="charts-row">
+    <div class="chart-card"><div class="chart-title">Records per File</div><div class="chart-wrap"><canvas id="chart-files"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Records per Sheet</div><div class="chart-wrap"><canvas id="chart-sheets"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="ct-dot"></span>File Breakdown</div>
+    <table class="fb-tbl"><thead><tr><th>File</th><th>Sheets</th><th>Records</th><th>Columns</th><th style="width:200px">Share</th></tr></thead>
+    <tbody id="file-breakdown-body"></tbody></table>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="ct-dot"></span>Sheet Preview</div>
+    <div class="tab-bar" id="preview-tabs"></div>
+    <div id="preview-content"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PAGE 3 — SEARCH
+══════════════════════════════════════ -->
+<div class="page" id="page-search">
+  <div class="search-layout">
+    <!-- Sidebar: history -->
+    <div class="search-sidebar">
+      <div class="history-card">
+        <div class="history-header">
+          Recent Searches
+          <span style="cursor:pointer;color:var(--ume);font-size:11px" onclick="clearHistory()">Clear</span>
+        </div>
+        <div class="history-list" id="history-list">
+          <div class="history-empty">No searches yet</div>
+        </div>
+      </div>
+    </div>
+    <!-- Main search area -->
+    <div class="search-main">
+      <div class="section-head">Search</div>
+      <div class="section-sub">Find any value across all your files simultaneously</div>
+      <div class="search-input-card">
+        <div class="si-wrap">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="query" placeholder="Search all files…" oninput="runSearch()" autocomplete="off">
+        </div>
+        <select class="si-sel" id="col-filter" onchange="runSearch()"><option value="">All columns</option></select>
+        <select class="si-sel" id="file-filter" onchange="runSearch()"><option value="">All files</option></select>
+      </div>
+      <span class="map-toggle" onclick="toggleMapPanel()">⚙ Column groupings</span>
+      <div id="col-map-panel"><div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Similar headings auto-merged into one column</div><div id="col-map-list"></div></div>
+      <div class="kpi-grid" id="search-kpis" style="margin-bottom:16px"></div>
+      <div class="legend" id="search-legend"></div>
+      <div id="results-wrap">
+        <div class="empty-state"><div class="es-icon">🔍</div><div class="es-title">Ready to search</div><div class="es-sub">Type a value above — DataLens will find it across every loaded file</div></div>
+      </div>
+      <div class="actions-bar" id="search-actions" style="display:none">
+        <span class="result-count" id="result-count"></span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-matcha btn-sm" onclick="pinToFindings()">📌 Save to Findings</button>
+          <button class="btn btn-primary btn-sm" id="export-search-btn" onclick="exportSearchXlsx()">⬇ Export Excel</button>
+          <button class="btn btn-sm" onclick="exportSearchPDF()">⬇ PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PAGE 4 — FINDINGS
+══════════════════════════════════════ -->
+<div class="page" id="page-findings">
+  <div id="findings-empty">
+    <div class="empty-state" style="padding:80px 20px">
+      <div class="es-icon">📌</div>
+      <div class="es-title">No findings yet</div>
+      <div class="es-sub">Run a search and click "Save to Findings" to build your report here</div>
+      <button class="btn btn-primary" onclick="switchPage('search')">Go to Search</button>
+    </div>
+  </div>
+  <div id="findings-content" style="display:none">
+    <div class="section-head">Findings Dashboard</div>
+    <div class="section-sub">All pinned search results, aggregated and visualised</div>
+    <div class="kpi-grid" id="findings-kpis"></div>
+    <div class="charts-row three">
+      <div class="chart-card"><div class="chart-title">Hits by File</div><div class="chart-wrap"><canvas id="f-chart-files"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Hits by Sheet</div><div class="chart-wrap"><canvas id="f-chart-sheets"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Hits by Column</div><div class="chart-wrap"><canvas id="f-chart-cols"></canvas></div></div>
+    </div>
+    <div id="pinned-list"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="clearFindings()">🗑 Clear All</button>
+      <button class="btn btn-sm" onclick="exportFindingsPDF()">⬇ PDF Report</button>
+      <button class="btn btn-primary btn-sm" onclick="exportFindingsXlsx()">⬇ Export Excel (Highlighted)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PAGE 5 — PROJECT TRACKER
+══════════════════════════════════════ -->
+<div class="page" id="page-tracker">
+  <div class="tracker-toolbar">
+    <div class="t-title">Project Tracker</div>
+    <div class="view-toggle">
+      <button class="vt-btn active" id="vt-kanban" onclick="setTrackerView('kanban')">Kanban</button>
+      <button class="vt-btn" id="vt-table" onclick="setTrackerView('table')">Table</button>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openAddTask()">＋ New Task</button>
+  </div>
+  <div id="tracker-kanban"></div>
+  <div id="tracker-table" style="display:none">
+    <div class="tbl-wrap"><div class="tbl-scroll">
+      <table class="task-tbl" id="task-tbl-el">
+        <thead><tr><th>Task</th><th>Status</th><th>Priority</th><th>Assignee</th><th>Deadline</th><th>Tags</th><th></th></tr></thead>
+        <tbody id="task-tbl-body"></tbody>
+      </table>
+    </div></div>
+  </div>
+</div>
+
+<!-- ADD TASK MODAL -->
+<div class="modal-bg" id="task-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAddTask()">✕</button>
+    <h2 id="modal-title">New Task</h2>
+    <div class="form-row"><label class="form-label">Task Title</label><input class="form-input" id="t-title" placeholder="What needs to be done?"></div>
+    <div class="form-row"><label class="form-label">Description</label><textarea class="form-textarea" id="t-desc" placeholder="Details…"></textarea></div>
+    <div class="form-row-2">
+      <div class="form-row" style="margin:0"><label class="form-label">Status</label>
+        <select class="form-select" id="t-status">
+          <option value="todo">To Do</option><option value="progress">In Progress</option>
+          <option value="review">Review</option><option value="done">Done</option>
+        </select>
+      </div>
+      <div class="form-row" style="margin:0"><label class="form-label">Priority</label>
+        <select class="form-select" id="t-priority">
+          <option value="high">High</option><option value="med">Medium</option><option value="low">Low</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row-2" style="margin-top:16px">
+      <div class="form-row" style="margin:0"><label class="form-label">Assignee</label><input class="form-input" id="t-assignee" placeholder="Name"></div>
+      <div class="form-row" style="margin:0"><label class="form-label">Deadline</label><input class="form-input" type="date" id="t-deadline"></div>
+    </div>
+    <div class="form-row" style="margin-top:16px"><label class="form-label">Tags (comma-separated)</label><input class="form-input" id="t-tags" placeholder="e.g. data, report, urgent"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px">
+      <button class="btn btn-sm" onclick="closeAddTask()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════ -->
+<script>
+// ── Sakura animation ───────────────────────────────────────────────────────
+(function(){
+  const canvas=document.getElementById('sakura-canvas');
+  const ctx=canvas.getContext('2d');
+  let W,H,petals=[];
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+  resize();window.addEventListener('resize',resize);
+  const COLORS=['#E8A0B0','#F5D5DD','#C94F6D','#F0E6D3','#D4E8E3'];
+  function rnd(a,b){return a+Math.random()*(b-a)}
+  function mkPetal(){return{x:rnd(0,W),y:rnd(-80,0),r:rnd(3,7),sp:rnd(.4,1.2),sw:rnd(.5,2),ang:rnd(0,Math.PI*2),rot:rnd(-.03,.03),color:COLORS[Math.floor(Math.random()*COLORS.length)]}}
+  for(let i=0;i<28;i++)petals.push({...mkPetal(),y:rnd(0,H)});
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    petals.forEach(p=>{
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.ang);
+      ctx.beginPath();
+      ctx.ellipse(0,0,p.r,p.r*.6,0,0,Math.PI*2);
+      ctx.fillStyle=p.color;ctx.globalAlpha=.6;ctx.fill();
+      ctx.restore();
+      p.y+=p.sp;p.x+=Math.sin(p.y*.02)*p.sw*.3;p.ang+=p.rot;
+      if(p.y>H+20)Object.assign(p,mkPetal());
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ── Theme ─────────────────────────────────────────────────────────────────
+function toggleTheme(){
+  const dark=document.documentElement.dataset.theme==='dark';
+  document.documentElement.dataset.theme=dark?'light':'dark';
+  document.getElementById('theme-btn').textContent=dark?'☀':'🌙';
+  rebuildCharts();
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+let allData=[],fileList=[],colGroups=[],fileColors={},lastResults=[],findings=[],searchHistory=[];
+let chartFiles=null,chartSheets=null,fChartFiles=null,fChartSheets=null,fChartCols=null;
+let editingTaskId=null;
+let tasks=[
+  {id:1,title:'Review Q3 Excel reports',desc:'Check all uploaded files for anomalies',status:'progress',priority:'high',assignee:'Aiko T.',deadline:'2025-07-15',tags:['data','review']},
+  {id:2,title:'Export findings to stakeholders',desc:'Generate highlighted Excel export and PDF',status:'todo',priority:'high',assignee:'Kenji M.',deadline:'2025-07-20',tags:['export','report']},
+  {id:3,title:'Normalise column headers',desc:'Ensure all files use consistent heading names',status:'review',priority:'med',assignee:'Sakura I.',deadline:'2025-07-12',tags:['cleanup']},
+  {id:4,title:'Dashboard design review',desc:'Validate charts and KPI layout with team',status:'done',priority:'low',assignee:'Hiro N.',deadline:'2025-07-08',tags:['design']},
+];
+let nextTaskId=5;
+
+// ── Colour palettes ────────────────────────────────────────────────────────
+const PALETTES=[
+  {bg:'#F5D5DD',text:'#7A2038',border:'#E8A0B0',chart:'#C94F6D',hex:{fill:'F5D5DD',font:'7A2038',accent:'C94F6D'}},
+  {bg:'#D4E8E3',text:'#1A4D3C',border:'#9DCCBF',chart:'#5D8A7A',hex:{fill:'D4E8E3',font:'1A4D3C',accent:'5D8A7A'}},
+  {bg:'#F0E6D3',text:'#6B4A1A',border:'#D4B887',chart:'#B08850',hex:{fill:'F0E6D3',font:'6B4A1A',accent:'B08850'}},
+  {bg:'#E0DCFF',text:'#3A2A9A',border:'#B0A8F0',chart:'#6B5BDB',hex:{fill:'E0DCFF',font:'3A2A9A',accent:'6B5BDB'}},
+  {bg:'#FFE8D0',text:'#7A3010',border:'#F0B080',chart:'#D4703A',hex:{fill:'FFE8D0',font:'7A3010',accent:'D4703A'}},
+  {bg:'#D0EEFF',text:'#0A3A6A',border:'#80C0F0',chart:'#3A80D4',hex:{fill:'D0EEFF',font:'0A3A6A',accent:'3A80D4'}},
+  {bg:'#FFD6F0',text:'#7A1A5A',border:'#F0A0D0',chart:'#D44A98',hex:{fill:'FFD6F0',font:'7A1A5A',accent:'D44A98'}},
+  {bg:'#D6FFE0',text:'#0A4A1A',border:'#80F0A0',chart:'#3AB854',hex:{fill:'D6FFE0',font:'0A4A1A',accent:'3AB854'}},
+  {bg:'#FFF0D0',text:'#6A4A00',border:'#F0D080',chart:'#C49A20',hex:{fill:'FFF0D0',font:'6A4A00',accent:'C49A20'}},
+  {bg:'#E8D0FF',text:'#4A1A7A',border:'#C080F0',chart:'#9040D0',hex:{fill:'E8D0FF',font:'4A1A7A',accent:'9040D0'}},
+];
+
+// ── Nav ────────────────────────────────────────────────────────────────────
+function switchPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('ntab-'+name).classList.add('active');
+  if(name==='overview')renderOverviewDash();
+  if(name==='findings')renderFindingsDash();
+  if(name==='tracker')renderTracker();
+}
+
+// ── Column normalisation ──────────────────────────────────────────────────
+const NOISE=/[\s_\-\.\/\\#()\[\]]/g;
+const ABBREVS={no:'number',num:'number',nbr:'number',nr:'number',dt:'date',yr:'year',mo:'month',amt:'amount',amnt:'amount',val:'value',qty:'quantity',qnt:'quantity',inv:'invoice',cust:'customer',clnt:'client',vend:'vendor',desc:'description',descp:'description',narr:'narration',ref:'reference',refno:'referencenumber',acct:'account',acc:'account',ac:'account',bal:'balance',cr:'credit',dr:'debit',addr:'address',ph:'phone',mob:'mobile',tel:'telephone',dept:'department',emp:'employee',empl:'employee',stat:'status',stts:'status',rmk:'remark',rem:'remark',rmks:'remarks'};
+function normKey(k){let s=String(k).toLowerCase().replace(NOISE,'');return ABBREVS[s]||s}
+function titleCase(s){return s.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/\b\w/g,c=>c.toUpperCase())}
+function buildColGroups(rk){const g=[];rk.forEach(raw=>{const norm=normKey(raw);const ex=g.find(x=>x.norm===norm);if(ex){if(!ex.aliases.includes(raw))ex.aliases.push(raw)}else g.push({canonical:titleCase(norm),norm,aliases:[raw]})});g.sort((a,b)=>b.aliases.length-a.aliases.length||a.canonical.localeCompare(b.canonical));return g}
+function keyToCanonical(k){const g=colGroups.find(g=>g.aliases.includes(k));return g?g.canonical:titleCase(k)}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function highlight(val,q){const s=String(val);const idx=s.toLowerCase().indexOf(q.toLowerCase());if(idx<0)return esc(s);return esc(s.slice(0,idx))+'<mark>'+esc(s.slice(idx,idx+q.length))+'</mark>'+esc(s.slice(idx+q.length))}
+function destroyChart(c){if(c)try{c.destroy()}catch(e){}return null}
+function isDark(){return document.documentElement.dataset.theme==='dark'}
+function themeVal(l,d){return isDark()?d:l}
+
+function rebuildCharts(){
+  if(document.getElementById('page-overview').classList.contains('active'))renderOverviewDash();
+  if(document.getElementById('page-findings').classList.contains('active'))renderFindingsDash();
+}
+
+// ── File loading ──────────────────────────────────────────────────────────
+function onDrag(e,over){e.preventDefault();document.getElementById('drop-zone').classList.toggle('drag-over',over)}
+function onDrop(e){e.preventDefault();onDrag(e,false);loadFiles(e.dataTransfer.files)}
+
+function loadFiles(files){
+  const toLoad=Array.from(files).filter(f=>/\.(xlsx|xls)$/i.test(f.name)).filter(f=>!fileList.find(e=>e.name===f.name)).slice(0,10-fileList.length);
+  if(!toLoad.length)return;
+  const pw=document.getElementById('progress-wrap');pw.style.display='block';
+  let done=0;
+  const setProgress=(n,total,name)=>{
+    const pct=Math.round(n/total*100);
+    document.getElementById('progress-fill').style.width=pct+'%';
+    document.getElementById('progress-pct').textContent=pct+'%';
+    document.getElementById('progress-name').textContent=name||'Indexing…';
+  };
+  toLoad.forEach((file,fi)=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      setProgress(fi+.5,toLoad.length,'Reading: '+file.name);
+      try{
+        const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        wb.SheetNames.forEach(sn=>{
+          const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:''});
+          rows.forEach(r=>allData.push({file:file.name,sheet:sn,row:r}));
+        });
+        fileList.push(file);
+        fileColors[file.name]=PALETTES[(fileList.length-1)%PALETTES.length];
+      }catch(err){console.error(err)}
+      done++;
+      setProgress(done,toLoad.length,done===toLoad.length?'Done!':'Indexing…');
+      if(done===toLoad.length)finishLoad();
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function finishLoad(){
+  const rawKeys=[...new Set(allData.flatMap(d=>Object.keys(d.row)))];
+  colGroups=buildColGroups(rawKeys);
+  renderChips();buildFilters();renderColMapPanel();
+  const b=document.getElementById('badge-files');b.textContent=fileList.length;b.style.display='inline';
+  document.getElementById('upload-cta').style.display='flex';
+  setTimeout(()=>{document.getElementById('progress-wrap').style.display='none'},1000);
+}
+
+function renderChips(){
+  document.getElementById('file-chips').innerHTML=fileList.map((f,i)=>{
+    const c=fileColors[f.name]||PALETTES[0];
+    return`<span class="chip" style="background:${c.bg};color:${c.text};border-color:${c.border}">📄 ${esc(f.name)}<span class="chip-rm" onclick="removeFile(${i})">✕</span></span>`;
+  }).join('');
+}
+function removeFile(i){
+  const fname=fileList[i].name;fileList.splice(i,1);delete fileColors[fname];
+  allData=allData.filter(d=>d.file!==fname);
+  colGroups=buildColGroups([...new Set(allData.flatMap(d=>Object.keys(d.row)))]);
+  renderChips();buildFilters();renderColMapPanel();
+  const b=document.getElementById('badge-files');b.textContent=fileList.length;
+  if(!fileList.length){b.style.display='none';document.getElementById('upload-cta').style.display='none'}
+}
+
+// ── Overview Dashboard ────────────────────────────────────────────────────
+function renderOverviewDash(){
+  if(!fileList.length)return;
+  const totalRec=allData.length,totalSheets=[...new Set(allData.map(d=>d.file+'|||'+d.sheet))].length;
+  const merged=colGroups.filter(g=>g.aliases.length>1).length;
+  const gc=isDark()?'#8E8E95':'#6B6B70',gc2=isDark()?'#3A3A3C':'#EDE7DE';
+  document.getElementById('kpi-grid').innerHTML=`
+    <div class="kpi"><div class="kpi-label">Files</div><div class="kpi-value">${fileList.length}</div><div class="kpi-sub">loaded</div><div class="kpi-accent" style="background:var(--ume)"></div></div>
+    <div class="kpi"><div class="kpi-label">Records</div><div class="kpi-value">${totalRec.toLocaleString()}</div><div class="kpi-sub">total rows</div><div class="kpi-accent" style="background:var(--matcha)"></div></div>
+    <div class="kpi"><div class="kpi-label">Sheets</div><div class="kpi-value">${totalSheets}</div><div class="kpi-sub">across all files</div><div class="kpi-accent" style="background:var(--gold)"></div></div>
+    <div class="kpi"><div class="kpi-label">Columns</div><div class="kpi-value">${colGroups.length}</div><div class="kpi-sub">unified</div><div class="kpi-accent" style="background:var(--ume)"></div></div>
+    <div class="kpi"><div class="kpi-label">Merged Groups</div><div class="kpi-value">${merged}</div><div class="kpi-sub">auto-normalised</div><div class="kpi-accent" style="background:var(--matcha)"></div></div>
+    <div class="kpi"><div class="kpi-label">Avg / File</div><div class="kpi-value">${(totalRec/Math.max(fileList.length,1)).toFixed(0)}</div><div class="kpi-sub">records</div><div class="kpi-accent" style="background:var(--gold)"></div></div>
+  `;
+  const filenames=fileList.map(f=>f.name.replace(/\.xlsx?$/i,''));
+  const fileRecs=fileList.map(f=>allData.filter(d=>d.file===f.name).length);
+  const chartColors=fileList.map(f=>(fileColors[f.name]||PALETTES[0]).chart);
+  Chart.defaults.color=gc;Chart.defaults.borderColor=gc2;Chart.defaults.font.family="'Inter',system-ui,sans-serif";
+  chartFiles=destroyChart(chartFiles);
+  chartFiles=new Chart(document.getElementById('chart-files'),{type:'bar',data:{labels:filenames,datasets:[{data:fileRecs,backgroundColor:chartColors,borderRadius:8,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:gc2},ticks:{color:gc,font:{size:11}}},x:{grid:{display:false},ticks:{color:gc,font:{size:10}}}},responsive:true,maintainAspectRatio:false}});
+  const sheetMap={};allData.forEach(d=>{const k=d.file.replace(/\.xlsx?$/i,'')+' / '+d.sheet;sheetMap[k]=(sheetMap[k]||0)+1});
+  const sk=Object.keys(sheetMap),sv=sk.map(k=>sheetMap[k]),sc=sk.map((_,i)=>PALETTES[i%10].chart);
+  chartSheets=destroyChart(chartSheets);
+  chartSheets=new Chart(document.getElementById('chart-sheets'),{type:'doughnut',data:{labels:sk,datasets:[{data:sv,backgroundColor:sc,borderWidth:0,hoverOffset:6}]},options:{plugins:{legend:{position:'right',labels:{color:gc,font:{size:10},boxWidth:10,padding:8}}},cutout:'65%',responsive:true,maintainAspectRatio:false}});
+  const maxRec=Math.max(...fileRecs,1);
+  document.getElementById('file-breakdown-body').innerHTML=fileList.map((f,i)=>{
+    const c=fileColors[f.name]||PALETTES[0];
+    const rec=fileRecs[i];
+    const sheets=[...new Set(allData.filter(d=>d.file===f.name).map(d=>d.sheet))];
+    const cols=[...new Set(allData.filter(d=>d.file===f.name).flatMap(d=>Object.keys(d.row)))].length;
+    return`<tr><td><span style="display:inline-flex;align-items:center;gap:8px"><span class="dot" style="background:${c.chart}"></span><strong>${esc(f.name)}</strong></span></td><td>${sheets.length} <span style="color:var(--ink3);font-size:11px">${sheets.map(s=>esc(s)).join(', ')}</span></td><td><strong>${rec.toLocaleString()}</strong></td><td>${cols}</td><td><div class="fb-bar-bg"><div class="fb-bar-fill" style="width:${Math.round(rec/maxRec*100)}%"></div></div></td></tr>`;
+  }).join('');
+  const unique=[];allData.forEach(d=>{const key=d.file+'|||'+d.sheet;if(!unique.find(u=>u.key===key))unique.push({file:d.file,sheet:d.sheet,key})});
+  document.getElementById('preview-tabs').innerHTML=unique.map((s,i)=>{const c=fileColors[s.file]||PALETTES[0];return`<div class="tab-btn${i===0?' active':''}" onclick="showPreview('${esc(s.file)}','${esc(s.sheet)}',this)"><span style="width:7px;height:7px;border-radius:2px;background:${c.chart};flex-shrink:0;display:inline-block"></span>${esc(s.file.replace(/\.xlsx?$/i,''))} / ${esc(s.sheet)}</div>`}).join('');
+  if(unique.length)showPreview(unique[0].file,unique[0].sheet,document.querySelector('.tab-btn'));
+}
+
+function showPreview(fname,sname,el){
+  document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const rows=allData.filter(d=>d.file===fname&&d.sheet===sname).slice(0,50);
+  if(!rows.length){document.getElementById('preview-content').innerHTML='<p style="color:var(--ink3);padding:12px;font-size:13px">No data</p>';return}
+  const cols=[...new Set(rows.flatMap(r=>Object.keys(r.row)))];
+  let html=`<div style="font-size:11px;color:var(--ink3);margin-bottom:8px">First ${rows.length} rows · <strong style="color:var(--ink2)">${fname}</strong> — <strong style="color:var(--ink2)">${sname}</strong></div><div class="prev-wrap"><div class="prev-scroll"><table class="prev"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(r=>{html+=`<tr>${cols.map(c=>`<td title="${esc(r.row[c]??'')}">${esc(r.row[c]??'')}</td>`).join('')}</tr>`});
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('preview-content').innerHTML=html;
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────
+function buildFilters(){
+  const cf=document.getElementById('col-filter'),ff=document.getElementById('file-filter');
+  const pc=cf.value,pf=ff.value;
+  cf.innerHTML='<option value="">All columns</option>'+colGroups.map(g=>`<option value="${esc(g.canonical)}">${esc(g.canonical)}${g.aliases.length>1?' ('+g.aliases.length+')':''}</option>`).join('');
+  ff.innerHTML='<option value="">All files</option>'+fileList.map(f=>`<option value="${esc(f.name)}">${esc(f.name)}</option>`).join('');
+  cf.value=pc;ff.value=pf;
+}
+function renderColMapPanel(){
+  const merged=colGroups.filter(g=>g.aliases.length>1);
+  document.getElementById('col-map-list').innerHTML=merged.length?merged.map(g=>`<div class="map-group"><span class="map-canonical">${esc(g.canonical)}</span><span style="display:flex;flex-wrap:wrap;gap:4px">${g.aliases.map(a=>`<span class="alias-tag">${esc(a)}</span>`).join('')}</span></div>`).join(''):'<em style="color:var(--ink4);font-size:12px">No merged groups yet</em>';
+}
+function toggleMapPanel(){const p=document.getElementById('col-map-panel');p.style.display=p.style.display==='none'?'block':'none'}
+
+function runSearch(){
+  const q=document.getElementById('query').value.trim();
+  const colF=document.getElementById('col-filter').value;
+  const fileF=document.getElementById('file-filter').value;
+  renderSearchLegend();
+  if(!q){
+    document.getElementById('search-kpis').innerHTML='';
+    document.getElementById('results-wrap').innerHTML=`<div class="empty-state"><div class="es-icon">🔍</div><div class="es-title">Ready to search</div><div class="es-sub">Type a value above — DataLens will find it across every loaded file</div></div>`;
+    document.getElementById('search-actions').style.display='none';return;
+  }
+  const filterRawKeys=colF?new Set((colGroups.find(g=>g.canonical===colF)||{aliases:[]}).aliases):null;
+  const results=[];
+  allData.forEach(d=>{
+    if(fileF&&d.file!==fileF)return;
+    const matchedCanonicals=new Set();let hit=false;
+    Object.keys(d.row).forEach(k=>{
+      if(filterRawKeys&&!filterRawKeys.has(k))return;
+      if(String(d.row[k]).toLowerCase().includes(q.toLowerCase())){matchedCanonicals.add(keyToCanonical(k));hit=true}
+    });
+    if(hit)results.push({file:d.file,sheet:d.sheet,row:d.row,matchedCanonicals});
+  });
+  lastResults=results;
+  // add to history
+  addToHistory(q,colF,fileF,results.length);
+  const filesHit=new Set(results.map(r=>r.file));
+  const sheetsHit=new Set(results.map(r=>r.file+'|'+r.sheet));
+  const colsHit=new Set(results.flatMap(r=>[...r.matchedCanonicals]));
+  document.getElementById('search-kpis').innerHTML=`
+    <div class="kpi"><div class="kpi-label">Matched</div><div class="kpi-value" style="color:var(--matcha)">${results.length.toLocaleString()}</div><div class="kpi-sub">records</div></div>
+    <div class="kpi"><div class="kpi-label">Files Hit</div><div class="kpi-value">${filesHit.size}/${fileList.length}</div><div class="kpi-sub">files</div></div>
+    <div class="kpi"><div class="kpi-label">Sheets Hit</div><div class="kpi-value">${sheetsHit.size}</div><div class="kpi-sub">sheets</div></div>
+    <div class="kpi"><div class="kpi-label">Columns</div><div class="kpi-value">${colsHit.size}</div><div class="kpi-sub">matched</div></div>
+    <div class="kpi"><div class="kpi-label">Match Rate</div><div class="kpi-value" style="color:var(--ume)">${Math.round(results.length/Math.max(allData.length,1)*100)}%</div><div class="kpi-sub">of all records</div></div>
+  `;
+  if(!results.length){
+    document.getElementById('results-wrap').innerHTML=`<div class="empty-state"><div class="es-icon">🌸</div><div class="es-title">No results found</div><div class="es-sub">Nothing matched "<strong>${esc(q)}</strong>" — try a different term</div></div>`;
+    document.getElementById('search-actions').style.display='none';return;
+  }
+  const canonicalsInResults=colF?[colF]:[...new Set(results.flatMap(r=>Object.keys(r.row).map(keyToCanonical)))];
+  const colDefs=canonicalsInResults.map(can=>colGroups.find(g=>g.canonical===can)||{canonical:can,aliases:[can]});
+  let html=`<div class="tbl-wrap"><div class="tbl-scroll"><table class="dt"><thead><tr><th class="src-h">Source</th>${colDefs.map(g=>{const isM=results.some(r=>r.matchedCanonicals.has(g.canonical));return`<th class="${isM?'match-h':''}" title="${g.aliases.map(a=>esc(a)).join(', ')}">${esc(g.canonical)}${g.aliases.length>1?' ⚡':''}</th>`}).join('')}</tr></thead><tbody>`;
+  results.slice(0,1000).forEach(r=>{
+    const c=fileColors[r.file]||PALETTES[0];
+    html+=`<tr><td class="src-col"><div class="src-badge"><span class="src-file" style="background:${c.bg};color:${c.text};border:1px solid ${c.border}">${esc(r.file.replace(/\.xlsx?$/i,''))}</span><span class="src-sheet">📄 ${esc(r.sheet)}</span></div></td>`;
+    colDefs.forEach(g=>{
+      let rawVal='',usedAlias='';
+      for(const a of g.aliases){if(r.row[a]!==undefined&&r.row[a]!==''){rawVal=r.row[a];usedAlias=a;break}}
+      const isM=r.matchedCanonicals.has(g.canonical);
+      const hint=(usedAlias&&usedAlias!==g.canonical)?`<span class="col-alias">${esc(usedAlias)}</span>`:'';
+      html+=`<td title="${esc(rawVal)}">${isM?highlight(rawVal,q):esc(rawVal)}${hint}</td>`;
+    });
+    html+=`</tr>`;
+  });
+  if(results.length>1000)html+=`<tr><td colspan="${colDefs.length+1}" style="text-align:center;color:var(--ink4);padding:10px;font-size:11px">Showing first 1,000 of ${results.length.toLocaleString()} — export to see all</td></tr>`;
+  html+=`</tbody></table></div></div>`;
+  document.getElementById('results-wrap').innerHTML=html;
+  document.getElementById('result-count').textContent=`${results.length.toLocaleString()} result${results.length!==1?'s':''} across ${filesHit.size} file${filesHit.size!==1?'s':''}`;
+  document.getElementById('search-actions').style.display='flex';
+}
+
+function renderSearchLegend(){
+  document.getElementById('search-legend').innerHTML=fileList.map(f=>{const c=fileColors[f.name]||PALETTES[0];return`<span class="legend-item"><span class="legend-dot" style="background:${c.chart}"></span>${esc(f.name.replace(/\.xlsx?$/i,''))}</span>`}).join('');
+}
+
+// ── Search History ─────────────────────────────────────────────────────────
+function addToHistory(q,colF,fileF,count){
+  const existing=searchHistory.findIndex(h=>h.q===q);
+  if(existing>=0)searchHistory.splice(existing,1);
+  searchHistory.unshift({q,colF,fileF,count,ts:new Date().toLocaleTimeString()});
+  if(searchHistory.length>20)searchHistory.pop();
+  renderHistory();
+}
+function renderHistory(){
+  const el=document.getElementById('history-list');
+  if(!searchHistory.length){el.innerHTML='<div class="history-empty">No searches yet</div>';return}
+  el.innerHTML=searchHistory.map(h=>`<div class="history-item" onclick="applyHistory('${esc(h.q)}')"><span class="hi-q">${esc(h.q)}</span><span class="hi-count">${h.count}</span><span class="hi-time">${h.ts}</span></div>`).join('');
+}
+function applyHistory(q){
+  document.getElementById('query').value=q;
+  runSearch();
+}
+function clearHistory(){searchHistory=[];renderHistory()}
+
+// ── Findings ───────────────────────────────────────────────────────────────
+function pinToFindings(){
+  if(!lastResults.length)return;
+  const q=document.getElementById('query').value.trim();
+  const colF=document.getElementById('col-filter').value;
+  const fileF=document.getElementById('file-filter').value;
+  findings.push({q,colF,fileF,results:[...lastResults],ts:new Date().toLocaleString(),id:Date.now()});
+  const b=document.getElementById('badge-findings');b.textContent=findings.length;b.style.display='inline';
+  const btn=event.target.closest('button');const orig=btn.innerHTML;
+  btn.innerHTML='✓ Saved!';btn.style.background='var(--matcha)';
+  setTimeout(()=>{btn.innerHTML=orig;btn.style.background=''},1400);
+}
+function removeFinding(id){
+  findings=findings.filter(f=>f.id!==id);
+  const b=document.getElementById('badge-findings');
+  if(findings.length)b.textContent=findings.length;else b.style.display='none';
+  renderFindingsDash();
+}
+function clearFindings(){if(!confirm('Clear all findings?'))return;findings=[];document.getElementById('badge-findings').style.display='none';renderFindingsDash()}
+
+function renderFindingsDash(){
+  if(!findings.length){document.getElementById('findings-empty').style.display='block';document.getElementById('findings-content').style.display='none';return}
+  document.getElementById('findings-empty').style.display='none';
+  document.getElementById('findings-content').style.display='block';
+  const allFR=findings.flatMap(f=>f.results);
+  const filesHit=new Set(allFR.map(r=>r.file));
+  const sheetsHit=new Set(allFR.map(r=>r.file+'|'+r.sheet));
+  const colsHit=new Set(allFR.flatMap(r=>[...r.matchedCanonicals]));
+  document.getElementById('findings-kpis').innerHTML=`
+    <div class="kpi"><div class="kpi-label">Total Findings</div><div class="kpi-value" style="color:var(--ume)">${allFR.length.toLocaleString()}</div></div>
+    <div class="kpi"><div class="kpi-label">Files</div><div class="kpi-value">${filesHit.size}</div></div>
+    <div class="kpi"><div class="kpi-label">Sheets</div><div class="kpi-value">${sheetsHit.size}</div></div>
+    <div class="kpi"><div class="kpi-label">Columns</div><div class="kpi-value">${colsHit.size}</div></div>
+    <div class="kpi"><div class="kpi-label">Queries</div><div class="kpi-value">${findings.length}</div></div>
+  `;
+  const gc=isDark()?'#8E8E95':'#6B6B70',gc2=isDark()?'#3A3A3C':'#EDE7DE';
+  Chart.defaults.color=gc;Chart.defaults.borderColor=gc2;
+  const fileNames=[...filesHit];
+  fChartFiles=destroyChart(fChartFiles);
+  fChartFiles=new Chart(document.getElementById('f-chart-files'),{type:'bar',data:{labels:fileNames.map(f=>f.replace(/\.xlsx?$/i,'')),datasets:[{data:fileNames.map(f=>allFR.filter(r=>r.file===f).length),backgroundColor:fileNames.map(f=>(fileColors[f]||PALETTES[0]).chart),borderRadius:6,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:gc2},ticks:{color:gc,font:{size:10}}},x:{grid:{display:false},ticks:{color:gc,font:{size:10}}}},responsive:true,maintainAspectRatio:false}});
+  const sheetMap={};allFR.forEach(r=>{const k=r.file.replace(/\.xlsx?$/i,'')+'/'+r.sheet;sheetMap[k]=(sheetMap[k]||0)+1});
+  const sk=Object.keys(sheetMap),sv=sk.map(k=>sheetMap[k]),sc=sk.map((_,i)=>PALETTES[i%10].chart);
+  fChartSheets=destroyChart(fChartSheets);
+  fChartSheets=new Chart(document.getElementById('f-chart-sheets'),{type:'doughnut',data:{labels:sk,datasets:[{data:sv,backgroundColor:sc,borderWidth:0,hoverOffset:6}]},options:{plugins:{legend:{position:'bottom',labels:{color:gc,font:{size:10},boxWidth:10,padding:6}}},cutout:'60%',responsive:true,maintainAspectRatio:false}});
+  const colMap={};allFR.forEach(r=>r.matchedCanonicals.forEach(c=>{colMap[c]=(colMap[c]||0)+1}));
+  const ck=Object.keys(colMap).sort((a,b)=>colMap[b]-colMap[a]).slice(0,8);
+  fChartCols=destroyChart(fChartCols);
+  fChartCols=new Chart(document.getElementById('f-chart-cols'),{type:'bar',data:{labels:ck,datasets:[{data:ck.map(k=>colMap[k]),backgroundColor:ck.map((_,i)=>PALETTES[i%10].chart),borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,grid:{color:gc2},ticks:{color:gc,font:{size:10}}},y:{grid:{display:false},ticks:{color:gc,font:{size:11}}}},responsive:true,maintainAspectRatio:false}});
+  document.getElementById('pinned-list').innerHTML=findings.map(f=>{
+    const canonicalsInResults=[...new Set(f.results.flatMap(r=>Object.keys(r.row).map(keyToCanonical)))];
+    const colDefs=canonicalsInResults.map(can=>colGroups.find(g=>g.canonical===can)||{canonical:can,aliases:[can]});
+    const fHit=new Set(f.results.map(r=>r.file));
+    let tbl=`<div class="tbl-wrap" style="margin-top:12px"><div class="tbl-scroll"><table class="dt"><thead><tr><th class="src-h">Source</th>${colDefs.map(g=>{const isM=f.results.some(r=>r.matchedCanonicals.has(g.canonical));return`<th class="${isM?'match-h':''}">${esc(g.canonical)}</th>`}).join('')}</tr></thead><tbody>`;
+    f.results.slice(0,200).forEach(r=>{
+      const c=fileColors[r.file]||PALETTES[0];
+      tbl+=`<tr><td class="src-col"><div class="src-badge"><span class="src-file" style="background:${c.bg};color:${c.text};border:1px solid ${c.border}">${esc(r.file.replace(/\.xlsx?$/i,''))}</span><span class="src-sheet">📄 ${esc(r.sheet)}</span></div></td>`;
+      colDefs.forEach(g=>{let rawVal='',usedAlias='';for(const a of g.aliases){if(r.row[a]!==undefined&&r.row[a]!==''){rawVal=r.row[a];usedAlias=a;break}}const isM=r.matchedCanonicals.has(g.canonical);const hint=(usedAlias&&usedAlias!==g.canonical)?`<span class="col-alias">${esc(usedAlias)}</span>`:'';tbl+=`<td title="${esc(rawVal)}">${isM?highlight(rawVal,f.q):esc(rawVal)}${hint}</td>`});
+      tbl+=`</tr>`;
+    });
+    if(f.results.length>200)tbl+=`<tr><td colspan="${colDefs.length+1}" style="text-align:center;color:var(--ink4);padding:8px;font-size:11px">Showing 200 of ${f.results.length} — export for all</td></tr>`;
+    tbl+=`</tbody></table></div></div>`;
+    return`<div class="pinned-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px"><div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px"><span class="pq-label">🔍 "${esc(f.q)}"</span>${f.colF?`<span class="pf-tag ume">col: ${esc(f.colF)}</span>`:''}${f.fileF?`<span class="pf-tag matcha">file: ${esc(f.fileF)}</span>`:''}</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="pf-tag gold">${f.results.length.toLocaleString()} records</span><span class="pf-tag ume">${fHit.size} file${fHit.size!==1?'s':''}</span><span style="font-size:11px;color:var(--ink4)">${f.ts}</span><button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="removeFinding(${f.id})">✕</button></div></div>${tbl}</div>`;
+  }).join('');
+}
+
+// ── Project Tracker ─────────────────────────────────────────────────────────
+let trackerView='kanban';
+const STATUS_ORDER=['todo','progress','review','done'];
+const STATUS_LABELS={todo:'To Do',progress:'In Progress',review:'Review',done:'Done'};
+const STATUS_COLORS={todo:'var(--ink3)',progress:'var(--gold)',review:'var(--ume)',done:'var(--matcha)'};
+const STATUS_BG={todo:'var(--washi3)',progress:'var(--gold-light)',review:'var(--ume-light)',done:'var(--matcha-light)'};
+
+function setTrackerView(v){
+  trackerView=v;
+  document.getElementById('vt-kanban').classList.toggle('active',v==='kanban');
+  document.getElementById('vt-table').classList.toggle('active',v==='table');
+  document.getElementById('tracker-kanban').style.display=v==='kanban'?'grid':'none';
+  document.getElementById('tracker-table').style.display=v==='table'?'block':'none';
+  renderTracker();
+}
+function renderTracker(){
+  if(trackerView==='kanban')renderKanban();else renderTaskTable();
+}
+function renderKanban(){
+  document.getElementById('tracker-kanban').style.display='grid';
+  document.getElementById('tracker-kanban').innerHTML=STATUS_ORDER.map(st=>{
+    const stTasks=tasks.filter(t=>t.status===st);
+    return`<div class="kanban-col">
+      <div class="kanban-col-hdr">
+        <span class="kanban-col-name" style="color:${STATUS_COLORS[st]}">${STATUS_LABELS[st]}</span>
+        <span class="kanban-count" style="background:${STATUS_BG[st]};color:${STATUS_COLORS[st]}">${stTasks.length}</span>
+      </div>
+      ${stTasks.map(t=>taskCard(t)).join('')}
+      <div style="margin-top:6px"><button class="btn btn-sm" style="width:100%;justify-content:center;font-size:11px;border-style:dashed" onclick="openAddTask('${st}')">＋ Add task</button></div>
+    </div>`;
+  }).join('');
+}
+function taskCard(t){
+  const initials=(t.assignee||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const isOverdue=t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='done';
+  const tags=t.tags&&t.tags.length?t.tags.map(tag=>`<span style="font-size:10px;background:var(--washi2);border:1px solid var(--border);border-radius:3px;padding:1px 6px;color:var(--ink3)">${esc(tag)}</span>`).join(''):'';
+  return`<div class="task-card pri-${t.priority}" onclick="openEditTask(${t.id})">
+    <div class="task-title">${esc(t.title)}</div>
+    ${t.desc?`<div style="font-size:11px;color:var(--ink3);margin-bottom:8px;line-height:1.5">${esc(t.desc.slice(0,60))}${t.desc.length>60?'…':''}</div>`:''}
+    ${tags?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">${tags}</div>`:''}
+    <div class="task-meta">
+      <div class="task-assignee"><div class="task-avatar">${initials}</div>${esc(t.assignee||'Unassigned')}</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="pri-tag ${t.priority}">${t.priority}</span>
+        ${t.deadline?`<span class="task-due${isOverdue?' overdue':''}">${t.deadline}</span>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+function renderTaskTable(){
+  document.getElementById('task-tbl-body').innerHTML=tasks.map(t=>{
+    const isOverdue=t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='done';
+    return`<tr>
+      <td><strong>${esc(t.title)}</strong>${t.desc?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(t.desc.slice(0,60))}${t.desc.length>60?'…':''}</div>`:''}</td>
+      <td><span class="status-badge st-${t.status}">${STATUS_LABELS[t.status]}</span></td>
+      <td><span class="pri-tag ${t.priority}">${t.priority}</span></td>
+      <td>${esc(t.assignee||'—')}</td>
+      <td class="${isOverdue?'overdue':''}" style="${isOverdue?'color:var(--ume);font-weight:600':''}">${t.deadline||'—'}</td>
+      <td>${(t.tags||[]).map(tag=>`<span style="font-size:10px;background:var(--washi2);border:1px solid var(--border);border-radius:3px;padding:1px 6px;margin-right:3px">${esc(tag)}</span>`).join('')}</td>
+      <td><button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="openEditTask(${t.id})">Edit</button></td>
+    </tr>`;
+  }).join('');
+}
+function openAddTask(defaultStatus){
+  editingTaskId=null;
+  document.getElementById('modal-title').textContent='New Task';
+  document.getElementById('t-title').value='';
+  document.getElementById('t-desc').value='';
+  document.getElementById('t-status').value=defaultStatus||'todo';
+  document.getElementById('t-priority').value='med';
+  document.getElementById('t-assignee').value='';
+  document.getElementById('t-deadline').value='';
+  document.getElementById('t-tags').value='';
+  document.getElementById('task-modal').classList.add('open');
+}
+function openEditTask(id){
+  const t=tasks.find(t=>t.id===id);if(!t)return;
+  editingTaskId=id;
+  document.getElementById('modal-title').textContent='Edit Task';
+  document.getElementById('t-title').value=t.title;
+  document.getElementById('t-desc').value=t.desc||'';
+  document.getElementById('t-status').value=t.status;
+  document.getElementById('t-priority').value=t.priority;
+  document.getElementById('t-assignee').value=t.assignee||'';
+  document.getElementById('t-deadline').value=t.deadline||'';
+  document.getElementById('t-tags').value=(t.tags||[]).join(', ');
+  document.getElementById('task-modal').classList.add('open');
+}
+function closeAddTask(){document.getElementById('task-modal').classList.remove('open')}
+function saveTask(){
+  const title=document.getElementById('t-title').value.trim();
+  if(!title)return alert('Please enter a task title');
+  const data={title,desc:document.getElementById('t-desc').value.trim(),status:document.getElementById('t-status').value,priority:document.getElementById('t-priority').value,assignee:document.getElementById('t-assignee').value.trim(),deadline:document.getElementById('t-deadline').value,tags:document.getElementById('t-tags').value.split(',').map(s=>s.trim()).filter(Boolean)};
+  if(editingTaskId){const idx=tasks.findIndex(t=>t.id===editingTaskId);if(idx>=0)tasks[idx]={...tasks[idx],...data}}
+  else{tasks.push({id:nextTaskId++,...data})}
+  closeAddTask();renderTracker();
+}
+// Close modal on bg click
+document.getElementById('task-modal').addEventListener('click',e=>{if(e.target===document.getElementById('task-modal'))closeAddTask()});
+
+// ── Excel Export with highlights ──────────────────────────────────────────
+let excelJSLoaded=false;
+function loadExcelJS(){
+  return new Promise((res,rej)=>{
+    if(excelJSLoaded){res();return}
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    s.onload=()=>{excelJSLoaded=true;res()};s.onerror=rej;document.head.appendChild(s);
+  });
+}
+
+async function buildXlsx(findingsList,filename){
+  await loadExcelJS();
+  const wb=new ExcelJS.Workbook();wb.creator='DataLens';wb.created=new Date();
+
+  // Summary sheet
+  const sum=wb.addWorksheet('Summary',{tabColor:{argb:'FFC94F6D'}});
+  sum.views=[{state:'frozen',ySplit:1}];
+  const sumHdrRow=sum.addRow(['#','Search Query','Column Filter','File Filter','Records','Files Hit','Sheets Hit','Exported At']);
+  sumHdrRow.eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1C1C1E'}};c.font={bold:true,color:{argb:'FFFAFAF8'},name:'Calibri',size:10};c.alignment={horizontal:'center',vertical:'middle'};c.border={bottom:{style:'medium',color:{argb:'FFC94F6D'}}}});
+  sum.getRow(1).height=22;
+  findingsList.forEach((f,fi)=>{
+    const fHit=new Set(f.results.map(r=>r.file));
+    const sHit=new Set(f.results.map(r=>r.file+'|'+r.sheet));
+    const row=sum.addRow([fi+1,f.q||'(all)',f.colF||'All columns',f.fileF||'All files',f.results.length,fHit.size,sHit.size,f.ts||new Date().toLocaleString()]);
+    row.eachCell((c,ci)=>{
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:fi%2===0?'FFF4F0EC':'FFFAFAF8'}};
+      c.font={color:{argb:'FF1C1C1E'},name:'Calibri',size:10};
+      c.alignment={vertical:'middle',horizontal:ci===2?'left':'center'};
+      if(ci===5)c.font={...c.font,bold:true,color:{argb:'FF5D8A7A'}};
+    });
+    row.height=20;
+    row.getCell(2).value={text:f.q||'(all)',hyperlink:`#'Finding ${fi+1}'!A1`};
+    row.getCell(2).font={color:{argb:'FFC94F6D'},underline:true,name:'Calibri',size:10};
+  });
+  sum.columns=[{width:5},{width:32},{width:20},{width:22},{width:12},{width:12},{width:12},{width:22}];
+
+  // Detail sheets per finding
+  findingsList.forEach((f,fi)=>{
+    const sName=`Finding ${fi+1}`;
+    const ws=wb.addWorksheet(sName,{tabColor:{argb:'FF'+PALETTES[fi%10].hex.accent}});
+    ws.views=[{state:'frozen',xSplit:3,ySplit:2}];
+    const canonicals=[...new Set(f.results.flatMap(r=>Object.keys(r.row).map(keyToCanonical)))];
+    const colDefs=canonicals.map(can=>colGroups.find(g=>g.canonical===can)||{canonical:can,aliases:[can]});
+
+    // Row 1: meta banner
+    const metaCols=3+colDefs.length;
+    ws.mergeCells(1,1,1,metaCols);
+    const meta=ws.getCell(1,1);
+    const fHit=new Set(f.results.map(r=>r.file));
+    meta.value=`DataLens  |  Query: "${f.q||'(all)'}"  |  ${f.results.length.toLocaleString()} records  |  ${fHit.size} files${f.colF?' |  Col: '+f.colF:''}${f.fileF?' |  File: '+f.fileF:''}  |  Exported: ${f.ts||new Date().toLocaleString()}`;
+    meta.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1C1C1E'}};
+    meta.font={bold:true,color:{argb:'FFC94F6D'},name:'Calibri',size:10};
+    meta.alignment={horizontal:'left',vertical:'middle'};
+    ws.getRow(1).height=24;
+
+    // Row 2: headers
+    const headers=['Source File','Sheet','Matched In',...colDefs.map(g=>g.canonical)];
+    const hdr=ws.getRow(2);
+    headers.forEach((h,ci)=>{
+      const cell=hdr.getCell(ci+1);cell.value=h;
+      const isMatchCol=ci>=3&&f.results.some(r=>r.matchedCanonicals.has(colDefs[ci-3]?.canonical));
+      if(ci<3){cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1C1C1E'}};cell.font={bold:true,color:{argb:'FFAEAEB2'},name:'Calibri',size:10}}
+      else if(isMatchCol){cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF5D5DD'}};cell.font={bold:true,color:{argb:'FFC94F6D'},name:'Calibri',size:10}}
+      else{cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF4F0EC'}};cell.font={bold:true,color:{argb:'FF6B6B70'},name:'Calibri',size:10}}
+      cell.alignment={horizontal:'center',vertical:'middle'};
+      cell.border={bottom:{style:'medium',color:{argb:'FF3A3A3C'}}};
+      if(ci>=3&&colDefs[ci-3]?.aliases.length>1)cell.note={texts:[{text:'Original headers:\n'+colDefs[ci-3].aliases.join('\n')}]};
+    });
+    hdr.height=22;
+
+    // Data rows
+    f.results.forEach((r,ri)=>{
+      const p=PALETTES[fileList.findIndex(fl=>fl.name===r.file)%10]||PALETTES[0];
+      const dataRow=ws.getRow(ri+3);
+
+      // Source File (colour-coded)
+      const fCell=dataRow.getCell(1);
+      fCell.value=r.file;
+      fCell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+p.hex.fill}};
+      fCell.font={bold:true,color:{argb:'FF'+p.hex.font},name:'Calibri',size:10};
+      fCell.alignment={horizontal:'left',vertical:'middle'};
+      fCell.border={right:{style:'thin',color:{argb:'FFAEAEB2'}},bottom:{style:'hair',color:{argb:'FFEDE7DE'}}};
+
+      // Sheet
+      const sCell=dataRow.getCell(2);
+      sCell.value=r.sheet;
+      sCell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+p.hex.fill}};
+      sCell.font={italic:true,color:{argb:'FF'+p.hex.font},name:'Calibri',size:10};
+      sCell.alignment={horizontal:'center',vertical:'middle'};
+      sCell.border={right:{style:'thin',color:{argb:'FFAEAEB2'}},bottom:{style:'hair',color:{argb:'FFEDE7DE'}}};
+
+      // Matched In
+      const mCell=dataRow.getCell(3);
+      mCell.value=[...r.matchedCanonicals].join(', ');
+      mCell.fill={type:'pattern',pattern:'solid',fgColor:{argb:r.matchedCanonicals.size?'FFF5D5DD':'FFF4F0EC'}};
+      mCell.font={italic:true,color:{argb:r.matchedCanonicals.size?'FFC94F6D':'FF6B6B70'},name:'Calibri',size:9};
+      mCell.alignment={horizontal:'left',vertical:'middle',wrapText:true};
+      mCell.border={right:{style:'medium',color:{argb:'FFC94F6D'}},bottom:{style:'hair',color:{argb:'FFEDE7DE'}}};
+
+      // Data columns
+      colDefs.forEach((g,ci)=>{
+        let rawVal='',usedAlias='';
+        for(const a of g.aliases){if(r.row[a]!==undefined&&r.row[a]!==''){rawVal=r.row[a];usedAlias=a;break}}
+        const cell=dataRow.getCell(ci+4);
+        cell.value=rawVal===''?null:(!isNaN(rawVal)&&rawVal!=='')?Number(rawVal):String(rawVal);
+        const isMatchedCell=r.matchedCanonicals.has(g.canonical);
+        if(isMatchedCell){
+          cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF9C4'}};  // bright yellow
+          cell.font={bold:true,color:{argb:'FF78350F'},name:'Calibri',size:10};
+          cell.border={bottom:{style:'thin',color:{argb:'FFF59E0B'}},top:{style:'thin',color:{argb:'FFF59E0B'}}};
+          cell.note={texts:[{text:`🔍 Matched: "${f.q}"\nColumn: ${g.canonical}${usedAlias&&usedAlias!==g.canonical?'\nOriginal header: "'+usedAlias+'"':''}`}]};
+        } else {
+          cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:ri%2===0?'FFFAFAF8':'FFF4F0EC'}};
+          cell.font={color:{argb:'FF3A3A3C'},name:'Calibri',size:10};
+          cell.border={bottom:{style:'hair',color:{argb:'FFEDE7DE'}}};
+        }
+        cell.alignment={horizontal:'left',vertical:'middle'};
+      });
+      dataRow.height=18;
+    });
+
+    // Column widths
+    ws.getColumn(1).width=28;ws.getColumn(2).width=16;ws.getColumn(3).width=24;
+    colDefs.forEach((_,ci)=>ws.getColumn(ci+4).width=20);
+    ws.autoFilter={from:{row:2,column:1},to:{row:2,column:3+colDefs.length}};
+  });
+
+  // Pivot summary sheet
+  const pivot=wb.addWorksheet('Pivot Summary',{tabColor:{argb:'FF5D8A7A'}});
+  pivot.addRow(['DataLens — Pivot Summary']).getCell(1).font={bold:true,size:14,name:'Calibri',color:{argb:'FF1C1C1E'}};
+  pivot.addRow([]);
+  pivot.addRow(['Query','Records Found','Files Hit','Sheets Hit']).eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD4E8E3'}};c.font={bold:true,name:'Calibri',size:10,color:{argb:'FF1A4D3C'}};c.border={bottom:{style:'medium',color:{argb:'FF5D8A7A'}}}});
+  findingsList.forEach((f,fi)=>{
+    const fHit=new Set(f.results.map(r=>r.file));
+    const sHit=new Set(f.results.map(r=>r.file+'|'+r.sheet));
+    const row=pivot.addRow([f.q||'(all)',f.results.length,fHit.size,sHit.size]);
+    row.eachCell((c,ci)=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:fi%2===0?'FFFAFAF8':'FFF4F0EC'}};c.font={name:'Calibri',size:10,color:{argb:'FF1C1C1E'}};if(ci===2)c.font={...c.font,bold:true,color:{argb:'FF5D8A7A'}}});
+  });
+  pivot.columns=[{width:32},{width:16},{width:12},{width:12}];
+
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=filename;a.click();URL.revokeObjectURL(a.href);
+}
+
+async function exportSearchXlsx(){
+  if(!lastResults.length)return;
+  const btn=event.target.closest('button');const orig=btn.innerHTML;
+  btn.innerHTML='⏳ Building…';btn.disabled=true;
+  try{const q=document.getElementById('query').value.trim();const colF=document.getElementById('col-filter').value;const fileF=document.getElementById('file-filter').value;
+    await buildXlsx([{q,colF,fileF,results:lastResults,ts:new Date().toLocaleString()}],`datalens_${(q||'search').replace(/[^a-z0-9]/gi,'_').slice(0,30)}.xlsx`);
+  }finally{btn.innerHTML=orig;btn.disabled=false}
+}
+async function exportFindingsXlsx(){
+  if(!findings.length)return;
+  const btn=event.target.closest('button');const orig=btn.innerHTML;
+  btn.innerHTML='⏳ Building…';btn.disabled=true;
+  try{await buildXlsx(findings,'datalens_findings.xlsx')}
+  finally{btn.innerHTML=orig;btn.disabled=false}
+}
+
+// PDF export — print-style
+function exportSearchPDF(){
+  if(!lastResults.length)return;
+  const q=document.getElementById('query').value.trim();
+  printReport(`Search Results: "${q}"`,lastResults,q);
+}
+function exportFindingsPDF(){
+  if(!findings.length)return;
+  const allRec=findings.flatMap(f=>f.results.map(r=>({...r,query:f.q})));
+  printReport('DataLens Findings Report',allRec,'');
+}
+function printReport(title,records,q){
+  const canonicals=[...new Set(records.flatMap(r=>Object.keys(r.row).map(keyToCanonical)))].slice(0,10);
+  const colDefs=canonicals.map(can=>colGroups.find(g=>g.canonical===can)||{canonical:can,aliases:[can]});
+  let rows='';
+  records.slice(0,500).forEach(r=>{
+    const c=fileColors[r.file]||PALETTES[0];
+    rows+=`<tr><td style="background:${c.bg};color:${c.text};font-weight:700;white-space:nowrap">${r.file.replace(/\.xlsx?$/i,'')}</td><td style="color:#6B6B70;font-style:italic">${r.sheet}</td>`;
+    colDefs.forEach(g=>{let v='';for(const a of g.aliases){if(r.row[a]!==undefined&&r.row[a]!==''){v=r.row[a];break}}const isM=q&&r.matchedCanonicals&&r.matchedCanonicals.has(g.canonical);rows+=`<td style="${isM?'background:#FFF9C4;font-weight:700;color:#78350F':''}">`;if(isM&&q){const s=String(v);const idx=s.toLowerCase().indexOf(q.toLowerCase());rows+=idx>=0?esc(s.slice(0,idx))+'<span style="background:#FBBF24;color:#78350F;border-radius:2px;padding:0 2px">'+esc(s.slice(idx,idx+q.length))+'</span>'+esc(s.slice(idx+q.length)):esc(s)}else rows+=esc(v);rows+=`</td>`});
+    rows+=`</tr>`;
+  });
+  const w=window.open('','_blank','width=900,height=700');
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;padding:32px;color:#1C1C1E;font-size:12px}h1{font-family:'Noto Serif JP',serif;font-size:20px;color:#1C1C1E;margin-bottom:4px}p{color:#6B6B70;font-size:12px;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#F4F0EC;padding:8px 10px;text-align:left;font-weight:700;font-size:10px;border-bottom:1px solid #EDE7DE;text-transform:uppercase;letter-spacing:.3px}td{padding:7px 10px;border-bottom:1px solid #F4F0EC}@media print{.no-print{display:none}}</style></head><body><h1>${esc(title)}</h1><p>Generated by DataLens &nbsp;·&nbsp; ${new Date().toLocaleString()} &nbsp;·&nbsp; ${records.length.toLocaleString()} records</p><button class="no-print" onclick="window.print()" style="margin-bottom:16px;padding:8px 20px;background:#C94F6D;color:#fff;border:none;border-radius:100px;cursor:pointer;font-size:12px;font-weight:600">Print / Save as PDF</button><table><thead><tr><th>File</th><th>Sheet</th>${colDefs.map(g=>`<th>${esc(g.canonical)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></body></html>`);
+  w.document.close();
+}
+</script>
+</body>
+</html>
